@@ -1,18 +1,19 @@
 (ns logic-introduction.core
   (:refer-clojure :exclude [inc reify ==])
-  (:use [clojure.core.logic minikanren prelude nonrel match]))
+  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
 
-(defn findo [x l o]
-  (matcha [l]
-          ([[[?y :- o] . _]] 
-           (project [x ?y] (== (= x ?y) true)))
-          ([[_ . ?c]] (findo x ?c o))))
+(defn geto [k m v]
+  (matche [m]
+          ([[[k :- v] . _]])
+          ([[_ . ?r]] (geto k ?r v))))
 
 (defn typedo [c x t]
-  (conda
-    ((lvaro x) (findo x c t))
-    ((matche [x]
-             ([[:apply ?a ?b]]
+  (conde
+    ((geto x c t))
+    ((matche [c x t]
+             ([_ [:apply ?a ?b] _]
               (exist [s]
-                     (typedo c ?a [s :> t])
-                     (typedo c ?b s)))))))
+                     (!= ?a ?b)
+                     (typedo c ?b s)
+                     (typedo c ?a [s :> t])))))))
+
