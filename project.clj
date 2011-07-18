@@ -1,4 +1,4 @@
 (defproject logic-introduction "1.0.0-SNAPSHOT"
-  :description "FIXME: write description"
+  :description "Introduction to Logic Programming"
   :dependencies [[org.clojure/clojure "1.2.1"]
-                 [core.logic "0.6.1-SNAPSHOT"]])
+                 [org.clojure/core.logic "0.6.2"]])
