@@ -1,19 +1,21 @@
 (ns logic-introduction.core
-  (:refer-clojure :exclude [inc reify ==])
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
+    (:refer-clojure :exclude [inc reify ==])
+    (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
 
-(defn geto [k m v]
-  (matche [m]
-          ([[[k :- v] . _]])
-          ([[_ . ?r]] (geto k ?r v))))
+(defn geto [key env value]
+  "Succeed if type association [key :- value] is found in vector env."
+  (matche [env]
+          ([[[key :- value] . _]])
+          ([[_ . ?rest]] (geto key ?rest value))))
 
-(defn typedo [c x t]
+(defn typedo [context exp result-type]
+  "Succeed if exp executed in context results in a result-type"
   (conde
-    ((geto x c t))
-    ((matche [c x t]
-             ([_ [:apply ?a ?b] _]
-              (exist [s]
-                     (!= ?a ?b)
-                     (typedo c ?b s)
-                     (typedo c ?a [s :> t])))))))
+    ((geto exp context result-type))
+    ((matche [context exp result-type]
+             ([_ [:apply ?fun ?arg] _]
+              (exist [arg-type]
+                     (!= ?fun ?arg)
+                     (typedo context ?arg arg-type)
+                     (typedo context ?fun [arg-type :> result-type])))))))
 
