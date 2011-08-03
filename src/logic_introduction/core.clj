@@ -1,19 +1,144 @@
 (ns logic-introduction.core
   (:refer-clojure :exclude [inc reify ==])
+  (:require (clojure (walk :as w)))
   (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
 
-(defn geto [k m v]
-  (matche [m]
-          ([[[k :- v] . _]])
-          ([[_ . ?r]] (geto k ?r v))))
 
-(defn typedo [c x t]
+;; Logic functions
+
+(defn geto [key env value]
+  "Succeed if type association [key :- value] is found in vector env."
+  (matche [env]
+          ([[[key :- value] . _]])
+          ([[_ . ?rest]] (geto key ?rest value))))
+
+(defn typedo [context exp result-type]
+  "Succeed if exp executed in context results in a result-type"
   (conde
-    ((geto x c t))
-    ((matche [c x t]
-             ([_ [:apply ?a ?b] _]
-              (exist [s]
-                     (!= ?a ?b)
-                     (typedo c ?b s)
-                     (typedo c ?a [s :> t])))))))
+    ((geto exp context result-type))
+    ((matche [context exp result-type]
+             ([_ [:apply ?fun ?arg] _]
+              (exist [arg-type]
+                     (!= ?fun ?arg)
+                     (typedo context ?arg arg-type)
+                     (typedo context ?fun [arg-type :> result-type])))))))
 
+
+;; Frontend functions
+
+(defmacro deftyped [name type arg-vec & body]
+  "Defines a function with a strict type"
+  (list* `defn
+         (with-meta name
+                    (assoc (meta name)
+                           :type type))
+         arg-vec
+         body))
+
+(defn- params-to-sym [form]
+  (-> (reduce (fn [f x]
+                (cons (if (list? x)
+                        (params-to-sym x)
+                        (with-meta (gensym)
+                                   {:type (class x)}))
+                      f))
+              (list (first form))
+              (rest form))
+    reverse))
+
+(defn call-to-lambda [form]
+  (reduce (fn [f x] 
+            (vector 
+              :apply
+              f
+              (if (list? x)
+                (call-to-lambda x)
+                x)))
+          (first form) (next form)))
+
+(defn declared-type [v]
+  {:pre [(var? v)]}
+  (let [t (-> v
+            meta
+            :type)]
+    (if t
+      t
+      (throw (Exception. (str v (class v) " has no type declaration"))))))
+
+(defn extract-environment [form]
+  (->> form
+    (reduce (fn [f x]
+              (cond
+                (symbol? x) (apply vector [x :- (or (-> (meta x) :type)
+                                                    (declared-type (resolve x)))]
+                                   f)
+                (vector? x) (vec (concat f (extract-environment x)))))
+            [])
+    (filter identity)
+    vec))
+
+(defn return-type [form]
+  {:pre [(list? form)]}
+  (let [f (first form)
+        t (declared-type (resolve f))
+        get-return (fn get-return [t]
+                     (reduce (fn [f x]
+                               (if (vector? x)
+                                 (get-return x)
+                                 x))
+                             []
+                             t))]
+    (get-return t)))
+
+  
+(defn type-check-form [form]
+  "Type checks a form"
+  (let [call (-> form
+               params-to-sym
+               call-to-lambda)
+        env (->> (extract-environment call)
+              (apply sorted-set)
+              (into []))
+        return (return-type form)]
+    (run* [q]
+          (typedo env
+                  call
+                  return)
+          (== true q))))
+
+
+;; Example usage
+
+(comment
+(deftyped 
+  addInteger
+  [Integer :> [Integer :> Integer]]
+  [x y]
+  (+ x y))
+
+(deftyped 
+  addDouble
+  [Double :> [Double :> Double]]
+  [x y]
+  (+ x y))
+
+(deftyped
+  maxDouble
+  [Double :> [Double :> Double]]
+  [x y]
+  (max x y))
+
+(type-check-form
+  '(maxDouble (addDouble 1.0 2.0)
+              (addDouble 2.0 3.0)))
+;=> (true)
+
+(type-check-form
+  '(maxDouble (addDouble 1 2.0)
+              (addDouble 2.0 3.0)))
+;=> ()
+
+(type-check-form 
+  '(addDouble 1.1 2.1))
+;=> (true)
+)
