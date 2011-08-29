@@ -58,19 +58,19 @@
 
 (defn declared-type [v]
   {:pre [(var? v)]}
-  (let [t (-> v
-            meta
-            :type)]
-    (if t
-      t
-      (throw (Exception. (str v (class v) " has no type declaration"))))))
+  (-> v
+    meta
+    :type))
 
 (defn extract-environment [form]
   (->> form
     (reduce (fn [f x]
               (cond
                 (symbol? x) (apply vector [x :- (or (-> (meta x) :type)
-                                                    (declared-type (resolve x)))]
+                                                    (declared-type (resolve x))
+                                                    (-> x
+                                                      eval
+                                                      class))]
                                    f)
                 (vector? x) (vec (concat f (extract-environment x)))))
             [])
