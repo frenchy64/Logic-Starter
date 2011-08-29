@@ -3,6 +3,7 @@
   (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
 
 ;; Calculate palindromes using pushdown automata
+;; From "The Art of Prolog" Sterling and Shapiro, 2nd ed, pg 381
 
 (defn palindrome
   ([l] (palindrome l :push []))
