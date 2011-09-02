@@ -9,10 +9,15 @@
   (llist n []))
 
 (def zero 0)
-(def one (s zero))
+(def one   (s zero))
+(def two   (s one))
+(def three (s two))
+(def four  (s three))
+(def five  (s four))
+(def six   (s five))
 
 (defn natural-number [x]
-  "x is a natural number"
+  "A relation where x is a natural number"
   (matche [x]
           ([zero])
           ([(s ?x)] (natural-number ?x))))
@@ -92,40 +97,3 @@
   (matche [x y z]
           ([_ _ ?gcd] (modo x y z) (gcd y z ?gcd))
           ([x zero x] (<o zero x))))
-
-
-; (run 3 [q]
-;      (natural-number q))
-; ;=> (0 (0 . _.0) ((0 . _.0) . _.1))
-; (run 3 [q]
-;      (natural-number 0)
-;      (== q true))
-; ;=> (true)
-
-; (run 2 [q]
-;      (<=o 0 q))
-; ;=> (0 (0 . _.0))
-; (run 2 [q]
-;      (<=o [0] q))
-; ;=> ((0 . _.0) ((0 . _.0) . _.1)))
-
-; (run 4 [q]
-;      (times one one one))
-; ;=> ()
-; (run 4 [q]
-;      (times one one one))
-; ;=> (_.0)
-; (run 4 [q]
-;      (times one one q))
-; ;=> ((0))
-; (run 4 [q]
-;      (times zero one q))
-; ;=> (0)
-; (run 4 [q]
-;      (times one zero q))
-; ;=> (0)
-
-;; Good one
-; (run 4 [q]
-;      (minimum one one q))
-; ((0) (0))
