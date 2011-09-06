@@ -5,9 +5,12 @@
 
 ;; http://www.daddymodern.com/useful-prolog/
 
-(def url-to-process "http://api.worldbank.org/countries/USA/indicators/AG.AGR.TRAC.NO?per_page=10&date=2005:2011&format=json")
+(defn url-to-process [url]
+  (== url "http://api.worldbank.org/countries/USA/indicators/AG.AGR.TRAC.NO?per_page=10&date=2005:2011&format=json"))
 
 (defn slurpo [url datastream]
+  "Input: url
+  Output: datastream"
   (project [url]
     (== datastream (slurp url))))
 
@@ -15,29 +18,30 @@
   (project [input]
     (== output (read-json input))))
 
+
 (defn fetch-data [fetched-data]
-  (exist [datastream]
-    (slurpo url-to-process datastream)
+  (exist [url datastream]
+    (url-to-process url)
+    (slurpo url datastream)
     (read-jsono datastream fetched-data)))
 
 (defn process-data-header [header]
   (matche [header]
           ([?ignore])))
 
-;; TODO how to pattern match a map? Turn into seq..
 (defn json-object-has-value [json-object name value]
-  (matche [json-object]
-          ([[[name value] . ?rest]]
-           )))
+  (project [json-object name]
+    (== [name value] (find json-object name))))
 
 (defn process-json-object [json-object]
-  (exist [date datevalue value indicator-value]
-    (json-object-has-value json-object date datevalue)
-    (json-object-has-value json-object value indicator-value)
+  (exist [date-value indicator-value temp]
+    (json-object-has-value json-object :date date-value)
+    (json-object-has-value json-object :value indicator-value)
     (project [date-value indicator-value]
-             (println "Date: " date-value)
-             (println "Value: " indicator-value)
-             (println))))
+             ;; TODO probably have to wrap println
+             (== temp (println "Date: " date-value))
+             (== temp (println "Value: " indicator-value))
+             (== temp (println)))))
 
 (defn process-data-contents [json]
   (matche [json]
@@ -51,3 +55,8 @@
           ([[?header . ?contents]] 
             (process-data-header ?header)
             (process-data-contents ?contents))))
+
+(defn fetch-and-process-data []
+  (run* [fetched-data]
+        (fetch-data fetched-data)
+        (process-data fetched-data)))
