@@ -1,6 +1,11 @@
 (ns logic-introduction.facts
   (:refer-clojure :exclude [inc reify ==])
-  (:use [clojure.core.logic prelude minikanren match nonrel tabled]))
+  (:use [clojure.core.logic prelude minikanren match nonrel tabled disequality]))
+
+
+(defn printlno [& rest]
+  (== nil (do (apply println rest)
+            (flush))))
 
 ;; t2 derives t1
 (defrel derives t1 t2)
@@ -29,24 +34,28 @@
          (derived-ancestor ancestor i)
          (derives i descendant))))))
 
-(defn printlno [& rest]
-  (== nil (do (apply println rest)
-            (flush))))
-
 (defn partition-by-preference [xs pivot littles bigs]
   (matche [xs pivot littles bigs]
-          ([[?x . ?xs] ?y [?x . ?littles] ?bigs]
+          ;; Check for ambiguous preference
+          ([[?x . ?xs] ?y _ _]
+           (prefer ?x ?y)
+           (prefer ?y ?x)
+           (project [?x ?y]
+                    (throw (Exception. (str "Ambiguous preference: " ?x ?y)))))
+          ;; Greater than or equal to pivot ...
+          ([[?x . ?xs] ?y [?x . ?littles] _]
            (conde
-             ((== ?x pivot))
+             ((== ?x ?y))
              ((derived-ancestor ?x ?y))
              ((prefer ?x ?y)))
-           (partition-by-preference ?xs ?y ?littles ?bigs))
-          ([[?x . ?xs] ?y ?littles [?x . ?bigs]]
+           (partition-by-preference ?xs ?y ?littles bigs))
+          ;; Less than pivot ...
+          ([[?x . ?xs] ?y _ [?x . ?bigs]]
            (conde
              ((derived-ancestor ?y ?x))
              ((prefer ?y ?x)))
-           (partition-by-preference ?xs ?y ?littles ?bigs))
-          ([() pivot () ()])))
+           (partition-by-preference ?xs ?y littles ?bigs))
+          ([() _ () ()])))
 
 (defn sort-by-preference [ts out]
   "Input: ts
@@ -62,16 +71,11 @@
           ([() ()])))
 
 
+;; logic-introduction.facts=> (fact prefer Float Integer)
+;; nil
+;; logic-introduction.facts=> (fact prefer Integer Float)
+;; nil
 ;; logic-introduction.facts=> (run* [q]
 ;;                                  (sort-by-preference
-;;                                    [Number Object] q))
-;; ((java.lang.Object java.lang.Number))
-;; logic-introduction.facts=> (run* [q]
-;;                                  (sort-by-preference
-;;                                    [Number Object Integer] q))
-;; ((java.lang.Object java.lang.Number java.lang.Integer))
-;; logic-introduction.facts=> (run* [q]
-;;                                  (sort-by-preference
-;;                                    [Integer Number Object ] q))
-;; ((java.lang.Object java.lang.Number java.lang.Integer))
-;; logic-introduction.facts=> 
+;;                                    [Integer Float Object] q))
+;; #<RuntimeException java.lang.RuntimeException: java.lang.Exception: Ambiguous preference: class java.lang.Floatclass java.lang.Integer>
