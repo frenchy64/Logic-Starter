@@ -46,7 +46,7 @@
            (prefer ?x ?y)
            (prefer ?y ?x)
            (project [?x ?y]
-                    (== nil (println "Stuck in first"))))
+                    (== nil (println "Ambiguous preference"))))
           ([[?x . ?xs] ?y [?x . ?littles] ?bigs]
            (prefer ?x ?y)
            (partition-by-preference ?xs ?y ?littles ?bigs))
