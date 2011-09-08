@@ -29,10 +29,6 @@
          (derived-ancestor ancestor i)
          (derives i descendant))))))
 
-(defne appendo [x y z]
-       ([() _ y])
-       ([[?a . ?d] _ [?a . ?r]] (appendo ?d y ?r)))
-
 (defn printlno [& rest]
   (== nil (do (apply println rest)
             (flush))))
@@ -40,12 +36,15 @@
 (defn partition-by-preference [xs pivot littles bigs]
   (matche [xs pivot littles bigs]
           ([[?x . ?xs] ?y [?x . ?littles] ?bigs]
-           (conda
+           (conde
              ((== ?x pivot))
-             ((derived-ancestor ?x ?y)))
+             ((derived-ancestor ?x ?y))
+             ((prefer ?x ?y)))
            (partition-by-preference ?xs ?y ?littles ?bigs))
           ([[?x . ?xs] ?y ?littles [?x . ?bigs]]
-           (derived-ancestor ?y ?x)
+           (conde
+             ((derived-ancestor ?y ?x))
+             ((prefer ?y ?x)))
            (partition-by-preference ?xs ?y ?littles ?bigs))
           ([() pivot () ()])))
 
