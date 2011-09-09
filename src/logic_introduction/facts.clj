@@ -2,6 +2,10 @@
   (:refer-clojure :exclude [inc reify ==])
   (:use [clojure.core.logic prelude minikanren match nonrel tabled disequality]))
 
+(defne appendo [x y z]
+         ([() _ y])
+         ([[?a . ?d] _ [?a . ?r]] (appendo ?d y ?r)))
+
 
 (defn printlno [& rest]
   (== nil (do (apply println rest)

@@ -7,13 +7,15 @@
 ;; Logic functions
 
 (defn geto [key env value]
-  "Succeed if type association [key :- value] is found in vector env."
+  "env is an environment such that the expression key is
+  associated with the expression value"
   (matche [env]
           ([[[key :- value] . _]])
           ([[_ . ?rest]] (geto key ?rest value))))
 
 (defn typedo [context exp result-type]
-  "Succeed if exp executed in context results in a result-type"
+  "context is an environment such that expression exp executed in
+  environment context results in type result-type"
   (conde
     ((geto exp context result-type))
     ((matche [context exp result-type]
