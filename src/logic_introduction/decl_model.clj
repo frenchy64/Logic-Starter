@@ -207,6 +207,11 @@
 ;;
 ;; Nondeterministic LP:
 ;; - more flexible operational semantics
+;;
+;; This is core.logic, an implementation of minikanren.
+;;
+;; Instead of "dataflow" variables we have "logic variables", which are initialized
+;; to "fresh".
 
 
 (defn appendo [a b c]
@@ -233,9 +238,48 @@
 ;;
 ;; Specify how many results we wish to collect
 
+;; Emulating the operational semantics of append-iio
+
 (run 1 [q]
      (appendo [1] [2] q))
-;=> ([1 2])
+;=> ((1 2))
 
 
+;; Emulating the operational semantics of append-oii
 
+(run 1 [q]
+     (appendo q [2] [1 2]))
+;=> ((1))
+
+
+;; Emulating the operational semantics of append-iii
+
+(run 1 [q]
+     (appendo [1] [2] [1 2]))
+;=> (_.0)
+
+;; Unbound logic variables (fresh) are printed like this
+
+
+;; # Nondeterminism
+;;
+
+(run 4 [q]
+     (exist [a b]
+       (== q [a b])
+       (appendo a b [1 2 3])))
+;=> ([[] [1 2 3]] 
+;    [(1) (2 3)] 
+;    [(1 2) (3)] 
+;    [(1 2 3) ()])
+
+
+;; # exist
+;;
+;; introduces lexically scoped logic variables
+;;
+
+
+;; # ==
+;;
+;; Unifies its arguments
