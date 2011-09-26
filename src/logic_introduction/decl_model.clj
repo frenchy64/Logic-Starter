@@ -47,10 +47,9 @@
 ;; appended to the cons of first of a and b.
 
 (defn append [a b]
-  (if (empty? a)
-    b
-    (let [[x & as] a]
-      (append as (cons x b)))))
+  (match [a b]
+         [[] _] b
+         [[x & as] _] (append as (cons x b))))
 
 ;; # Eliminate return value
 ;;
@@ -143,12 +142,11 @@
 ;; Sets the dataflow variable c# to a appended to b
 
 (defn append-iio [a b c#]
-  (if (empty? a)
-    (set-once! c# b)
-    (let [[x & as] a
-          cs# (dataflow)]
-      (append-iio as b cs#)
-      (set-once! c# (cons x (deref cs#))))))
+  (match [a b c#]
+         [[] _ _] (set-once! c# b)
+         [[x & as] _ _] (let [cs# (dataflow)]
+                          (append-iio as b cs#)
+                          (set-once! c# (cons x (deref cs#))))))
 
 
 ;; # Logical semantics
@@ -163,12 +161,11 @@
 (defn append-oii
   "Declarative model append"
   [a# b c]
-  (if (= b c)
-    (set-once! a# [])
-    (let [[x & cs] c
-          as# (dataflow)]
-      (append-oii as# b cs)
-      (set-once! a# (cons x (deref as#))))))
+  (match [a# b c]
+         [_ _ c] (set-once! a# [])
+         [_ _ [x & cs]] (let [as# (dataflow)]
+                          (append-oii as# b cs)
+                          (set-once! a# (cons x (deref as#))))))
 
 ;; What about append-ooi ?
 ;;
@@ -216,8 +213,7 @@
 
 (defn appendo [a b c]
   (matche [a b c]
-          ([[] _ _]
-           (== b c))
+          ([[] _ b])
           ([[?x . ?as] _ [?x . ?cs]]
            (appendo ?as b ?cs))))
 
@@ -227,7 +223,7 @@
 ;;
 ;; Relations are the building blocks of nondeterministic logic programming
 ;; - no distinguishing between input/output parameters (wow!)
-;; - are themselves built from other relations
+;; - usually built using other relations
 
 
 ;; # run
