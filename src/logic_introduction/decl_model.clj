@@ -3,35 +3,108 @@
   (:use [clojure.core.logic minikanren prelude nonrel match disequality]
         [clojure.core.match [core :exclude [swap]]]))
 
-(defmacro solve-dataflow [[n] & body]
-  `(let [~n (dataflow)]
-     ~@body
-     (deref ~n)))
-
 (defprotocol SetOnce
   (set-once! [this v]))
+(defprotocol DFProtocol
+  (set-unsafe! [this v]))
 
-(def ^:private unbound-dataflow (Object.))
+(def ^:private unbound-dataflow :logic-introduction.decl-model/UNBOUND-DATAFLOW)
 
 (defn unbound? [d]
   (= @d unbound-dataflow))
 (defn make-unbound []
   (atom unbound-dataflow))
-(defn set-dataflow! [d v]
-  (dosync (swap! d (fn [_] v))))
 
 (deftype DataFlow [d]
   SetOnce
   (set-once! [_ v]
     (if (unbound? d)
-      (set-dataflow! d v)
+      (dosync (swap! d (fn [_] v)))
       (throw (Exception. "Already bound"))))
+
+  DFProtocol
+  (set-unsafe! [_ v]
+    (dosync (swap! d (fn [_] v))))
+
 
   clojure.lang.IDeref
   (deref [this] @d))
 
 (defn dataflow []
   (DataFlow. (make-unbound)))
+
+
+(defmulti set-or-equals (fn [l r] [(class l) (class r)]))
+
+(defmethod set-or-equals 
+  [DataFlow DataFlow]
+  [l r]
+  (match [(unbound? l) (unbound? r)] 
+         [true true] false ;;TODO
+         [true false] false ;(share-dataflow r l)
+         [false true] false
+         [false false] false))
+
+(defn- set-or-equals-df [^DataFlow df v]
+  (match [(unbound? df)]
+         [true] (do 
+                  (set-once! df v)
+                  true)
+         [false] (= @df v)))
+
+(defmethod set-or-equals 
+  [DataFlow Object]
+  [l r]
+  (set-or-equals-df l r))
+
+(defmethod set-or-equals 
+  [Object DataFlow]
+  [l r]
+  (set-or-equals-df r l))
+
+(defmethod set-or-equals 
+  [Object Object]
+  [l r]
+  (= r l))
+
+(defmacro choose-all [& goals]
+  (let [exp (map (fn [x] (list = true x)) goals)]
+    `(and ~@exp)))
+
+(defmacro choose-one 
+  "Clauses are lists of goals, each with one question
+  and 0+ answers"
+  [& clauses]
+  (let [cl (map (fn [[q & a]] (list
+                                (list = true q) 
+                                (list* `choose-all a))) clauses)
+        cl (reduce concat cl)]
+    `(cond
+       ~@cl
+       :else false)))
+
+(defmacro let-dataflow [[& names] & body]
+  (let [decl (map (fn [n] (list n (list `dataflow))) names)
+        decl (reduce concat decl)]
+    `(let [~@decl]
+       true
+       ~@body)))
+
+(defmacro undo-if-false [[& dfvars] & body]
+  `(let [~'old-vals (map deref (list ~@dfvars))]
+     (if (= false (choose-all ~@body))
+       (do (map #(set-or-equals %1 %2) (list ~@dfvars) ~'old-vals)
+           false)
+       true)))
+
+(defmacro solve-dataflow [[n] & body]
+  `(let [~n (dataflow)]
+     (if (= true
+            (choose-all
+              ~@body))
+       (deref ~n)
+       :NORESULT)))
+
 
 
 
@@ -156,6 +229,22 @@
                           (append-iio as b cs#)
                           (set-once! c# (cons x (deref cs#))))))
 
+(defn person [x#]
+  (choose-one
+    ((undo-if-false [x#]
+       (set-or-equals x# 'john)))
+    ((undo-if-false [x#]
+       (set-or-equals x# 'andrew)))
+    ((undo-if-false [x#]
+       (set-or-equals x# 'james)))))
+
+;(defn append-iio [a b c]
+;  (match [a b c]
+;         [[] _ _] (set-or-equals c b)
+;         [[x & as] _ _] (let-dataflow [cs]
+;                          (choose-all
+;                            (append-iio as b cs)
+;                            (set-or-equals c (cons x (deref cs)))))))
 
 ;; # Logical semantics
 ;;
