@@ -39,6 +39,7 @@
 (defmethod set-or-equals 
   [DataFlow DataFlow]
   [l r]
+  (throw (Exception. "not ready"))
   (match [(unbound? l) (unbound? r)] 
          [true true] false ;;TODO
          [true false] false ;(share-dataflow r l)
@@ -103,10 +104,7 @@
             (choose-all
               ~@body))
        (deref ~n)
-       :NORESULT)))
-
-
-
+       :logic-introduction.decl-model/NORESULT)))
 
 
 
@@ -229,22 +227,23 @@
                           (append-iio as b cs#)
                           (set-once! c# (cons x (deref cs#))))))
 
-(defn person [x#]
-  (choose-one
-    ((undo-if-false [x#]
-       (set-or-equals x# 'john)))
-    ((undo-if-false [x#]
-       (set-or-equals x# 'andrew)))
-    ((undo-if-false [x#]
-       (set-or-equals x# 'james)))))
 
-;(defn append-iio [a b c]
-;  (match [a b c]
-;         [[] _ _] (set-or-equals c b)
-;         [[x & as] _ _] (let-dataflow [cs]
-;                          (choose-all
-;                            (append-iio as b cs)
-;                            (set-or-equals c (cons x (deref cs)))))))
+(defn person [x]
+  (choose-one
+    ((undo-if-false [x]
+       (set-or-equals x 'john)))
+    ((undo-if-false [x]
+       (set-or-equals x 'andrew)))
+    ((undo-if-false [x]
+       (set-or-equals x 'james)))))
+
+(defn append-iio [a b c]
+  (match [a b c]
+         [[] _ _] (set-or-equals c b)
+         [[x & as] _ _] (let-dataflow [cs]
+                          (choose-all
+                            (append-iio as b cs)
+                            (set-or-equals c (cons x (deref cs)))))))
 
 ;; # Logical semantics
 ;;
