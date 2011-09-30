@@ -13,17 +13,25 @@
 
 (def ^:private unbound-dataflow (Object.))
 
-(deftype DataFlow [value]
+(defn unbound? [d]
+  (= @d unbound-dataflow))
+(defn make-unbound []
+  (atom unbound-dataflow))
+(defn set-dataflow! [d v]
+  (dosync (swap! d (fn [_] v))))
+
+(deftype DataFlow [d]
   SetOnce
   (set-once! [_ v]
-    (if (= @value unbound-dataflow)
-      (dosync (swap! value (fn [_] v)))
+    (if (unbound? d)
+      (set-dataflow! d v)
       (throw (Exception. "Already bound"))))
+
   clojure.lang.IDeref
-  (deref [this] @value))
+  (deref [this] @d))
 
 (defn dataflow []
-  (DataFlow. (atom unbound-dataflow)))
+  (DataFlow. (make-unbound)))
 
 
 
@@ -49,7 +57,7 @@
 (defn append [a b]
   (match [a b]
          [[] _] b
-         [[x & as] _] (append as (cons x b))))
+         [[x & as] _] (cons x (append as b))))
 
 ;; # Eliminate return value
 ;;
@@ -162,7 +170,7 @@
   "Declarative model append"
   [a# b c]
   (match [a# b c]
-         [_ _ c] (set-once! a# [])
+         [_ _ b] (set-once! a# [])
          [_ _ [x & cs]] (let [as# (dataflow)]
                           (append-oii as# b cs)
                           (set-once! a# (cons x (deref as#))))))
