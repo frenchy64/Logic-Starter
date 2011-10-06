@@ -1,72 +1,108 @@
 (ns logic-introduction.decl-model
   (:refer-clojure :exclude [inc reify == compile parse])
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]
+  (:import [java.io Writer])
+  (:use ;[clojure.core.logic [minikanren :exclude [LCons walk lfirst lrest lcons?]] prelude nonrel match disequality]
+        [clojure.walk :only [walk prewalk postwalk]]
         [clojure.core.match [core :exclude [swap]]]))
+
+(defn- composite?
+  "Taken from the old `contrib.core/seqable?`. Since the meaning of 'seqable' is
+  questionable, I will work on phasing it out and using a more meaningful
+  predicate.  At the moment, the only meaning of `composite?` is:
+  Returns true if `(seq x)` will succeed, false otherwise." 
+  [x]
+  (or (seq? x)
+      (instance? clojure.lang.Seqable x)
+      (nil? x)
+      (instance? Iterable x)
+      (-> x .getClass .isArray)
+      (string? x)
+      (instance? java.util.Map x)))
 
 (defprotocol SetOnce
   (set-once! [this v]))
 (defprotocol DFProtocol
   (set-unsafe! [this v]))
 
-(def ^:private unbound-dataflow :logic-introduction.decl-model/UNBOUND-DATAFLOW)
+(deftype FreshValue [] )
 
 (defn unbound? [d]
-  (= @d unbound-dataflow))
+  (instance? FreshValue @d))
 (defn make-unbound []
-  (atom unbound-dataflow))
+  (atom (FreshValue.)))
 
-(deftype DataFlow [d]
+(deftype LogicVariable [d]
   SetOnce
   (set-once! [_ v]
     (if (unbound? d)
-      (dosync (swap! d (fn [_] v)))
-      (throw (Exception. "Already bound"))))
+      (do 
+        (dosync (swap! d (fn [_] v)))
+        true)
+      false))
 
   DFProtocol
   (set-unsafe! [_ v]
     (dosync (swap! d (fn [_] v))))
 
-
   clojure.lang.IDeref
   (deref [this] @d))
 
-(defn dataflow []
-  (DataFlow. (make-unbound)))
+(defn logic-variable []
+  (LogicVariable. (make-unbound)))
 
+(defn reify-solved [v]
+  (prewalk (fn [e]
+             (if (instance? LogicVariable e)
+               (reify-solved @e)
+               e))
+             v))
 
 (defmulti set-or-equals (fn [l r] [(class l) (class r)]))
 
 (defmethod set-or-equals 
-  [DataFlow DataFlow]
+  [LogicVariable LogicVariable]
   [l r]
-  (throw (Exception. "not ready"))
-  (match [(unbound? l) (unbound? r)] 
-         [true true] false ;;TODO
-         [true false] false ;(share-dataflow r l)
-         [false true] false
-         [false false] false))
+  (if (identical? l r)
+    true
+    (match [(unbound? l) (unbound? r)] 
+           [true true] (set-once! l r)
+           [true false] (set-once! l @r)
+           [false true] (set-once! r @l)
+           [false false] (set-or-equals @l @r))))
 
-(defn- set-or-equals-df [^DataFlow df v]
+(defn- set-or-equals-df [^LogicVariable df v]
   (match [(unbound? df)]
-         [true] (do 
-                  (set-once! df v)
-                  true)
+         [true] (set-once! df v)
          [false] (= @df v)))
 
 (defmethod set-or-equals 
-  [DataFlow Object]
+  [LogicVariable Object]
   [l r]
   (set-or-equals-df l r))
 
 (defmethod set-or-equals 
-  [Object DataFlow]
+  [Object LogicVariable]
   [l r]
   (set-or-equals-df r l))
+
+(declare lcons? lfirst lrest)
 
 (defmethod set-or-equals 
   [Object Object]
   [l r]
-  (= r l))
+  (or
+    (match [(lcons? l) (lcons? r)]
+           [true true] (and (set-or-equals (lfirst l) (lfirst r))
+                            (set-or-equals (lrest l) (lrest r)))
+           [false true] (and (set-or-equals (first l) (lfirst r))
+                             (set-or-equals (rest l) (lrest r)))
+           [true false] (and (set-or-equals (lfirst l) (first r))
+                             (set-or-equals (lrest l) (rest r)))
+           :else false)
+    (and (composite? l) (composite? r)
+         (set-or-equals (first l) (first r))
+         (set-or-equals (rest l) (rest r)))
+    (= l r)))
 
 (defmacro choose-all [& goals]
   (let [exp (map (fn [x] (list = true x)) goals)]
@@ -84,8 +120,8 @@
        ~@cl
        :else false)))
 
-(defmacro let-dataflow [[& names] & body]
-  (let [decl (map (fn [n] (list n (list `dataflow))) names)
+(defmacro let-logic-variable [[& names] & body]
+  (let [decl (map (fn [n] (list n (list `logic-variable))) names)
         decl (reduce concat decl)]
     `(let [~@decl]
        true
@@ -98,14 +134,50 @@
            false)
        true)))
 
-(defmacro solve-dataflow [[n] & body]
-  `(let [~n (dataflow)]
+(defmacro solve-logic-variable [[n] & body]
+  `(let [~n (logic-variable)]
      (if (= true
             (choose-all
               ~@body))
-       (deref ~n)
+       (reify-solved ~n)
        :logic-introduction.decl-model/NORESULT)))
 
+(defprotocol LConsP
+  (lfirst [this])
+  (lrest [this]))
+(defprotocol LConsPrint
+    (toShortString [this]))
+
+
+(deftype LCons [a d]
+  LConsPrint
+  (toShortString [this]
+                 (cond
+                   (.. this getClass (isInstance d)) (str a " " (toShortString d))
+                   :else (str a " . " d )))
+  Object
+  (toString [this] (cond
+                     (.. this getClass (isInstance d)) (str "(" a " " (toShortString d) ")")
+                     :else (str "(" a " . " d ")")))
+  LConsP
+  (lfirst [_] a)
+  (lrest [_] d))
+
+(defn lcons [a d]
+  "Constructs a sequence a with an improper tail d if d is a logic variable."
+  (if (or (coll? d) (nil? d))
+    (cons a (seq d))
+    (LCons. a d )))
+
+(defn lcons? [x]
+  (instance? LCons x))
+
+(defmethod print-method LCons [x ^Writer writer]
+  (.write writer (str x)))
+
+(defn caro [p a]
+  (let [d (logic-variable)]
+    (set-or-equals (lcons a d) p)))
 
 
 ;; Semantics
@@ -179,7 +251,7 @@
 ;;
 ;; Computation has a different shape using output parameters
 ;;
-;; (let [x (dataflow)]
+;; (let [x (logic-variable)]
 ;;   (append [1] [2] x)
 ;;   @x)
 ;; ;=> [1 2]
@@ -189,13 +261,13 @@
 
 ;; # Collecting results
 ;;
-;; Abstract this pattern with "solve-dataflow". Implementation above.
+;; Abstract this pattern with "solve-logic-variable". Implementation above.
 ;;
-;; (solve-dataflow [x]
+;; (solve-logic-variable [x]
 ;;   (append [1] [2] x))
 ;; ;=> [1 2]
 ;;
-;; Returns the value of dataflow variable x after executing body.
+;; Returns the value of logic-variable variable x after executing body.
 
 
 ;; # Patterns of input/output arguments
@@ -218,12 +290,12 @@
 ;;
 ;; ## Operational semantics
 ;;
-;; Sets the dataflow variable c# to a appended to b
+;; Sets the logic-variable variable c# to a appended to b
 
 (defn append-iio [a b c#]
   (match [a b c#]
          [[] _ _] (set-once! c# b)
-         [[x & as] _ _] (let [cs# (dataflow)]
+         [[x & as] _ _] (let [cs# (logic-variable)]
                           (append-iio as b cs#)
                           (set-once! c# (cons x (deref cs#))))))
 
@@ -240,7 +312,7 @@
 (defn append-iio [a b c]
   (match [a b c]
          [[] _ _] (set-or-equals c b)
-         [[x & as] _ _] (let-dataflow [cs]
+         [[x & as] _ _] (let-logic-variable [cs]
                           (choose-all
                             (append-iio as b cs)
                             (set-or-equals c (cons x (deref cs)))))))
@@ -251,7 +323,7 @@
 ;;
 ;; # Operational semantics
 ;;
-;; Sets the dataflow variable a# to the value needed such that
+;; Sets the logic-variable variable a# to the value needed such that
 ;; a# appended to b equals c
 
 (defn append-oii
@@ -259,7 +331,7 @@
   [a# b c]
   (match [a# b c]
          [_ _ b] (set-once! a# [])
-         [_ _ [x & cs]] (let [as# (dataflow)]
+         [_ _ [x & cs]] (let [as# (logic-variable)]
                           (append-oii as# b cs)
                           (set-once! a# (cons x (deref as#))))))
 
@@ -303,15 +375,15 @@
 ;;
 ;; This is core.logic, an implementation of minikanren.
 ;;
-;; Instead of "dataflow" variables we have "logic variables", which are initialized
+;; Instead of "logic-variable" variables we have "logic variables", which are initialized
 ;; to "fresh".
 
 
-(defn appendo [a b c]
-  (matche [a b c]
-          ([[] _ b])
-          ([[?x . ?as] _ [?x . ?cs]]
-           (appendo ?as b ?cs))))
+;(defn appendo [a b c]
+;  (matche [a b c]
+;          ([[] _ b])
+;          ([[?x . ?as] _ [?x . ?cs]]
+;           (appendo ?as b ?cs))))
 
 ;; # appendo
 ;;
@@ -324,7 +396,7 @@
 
 ;; # run
 ;;
-;; Nondeterministic version of the deterministic solve-dataflow.
+;; Nondeterministic version of the deterministic solve-logic-variable.
 ;;
 ;; Returns a list results. Nondeterministic, multiple results!
 ;;
@@ -332,22 +404,22 @@
 
 ;; Emulating the operational semantics of append-iio
 
-(run 1 [q]
-     (appendo [1] [2] q))
+;(run 1 [q]
+;     (appendo [1] [2] q))
 ;=> ((1 2))
 
 
 ;; Emulating the operational semantics of append-oii
 
-(run 1 [q]
-     (appendo q [2] [1 2]))
+;(run 1 [q]
+;     (appendo q [2] [1 2]))
 ;=> ((1))
 
 
 ;; Emulating the operational semantics of append-iii
 
-(run 1 [q]
-     (appendo [1] [2] [1 2]))
+;(run 1 [q]
+;     (appendo [1] [2] [1 2]))
 ;=> (_.0)
 
 ;; Unbound logic variables (fresh) are printed like this
@@ -356,10 +428,10 @@
 ;; # Nondeterminism
 ;;
 
-(run 4 [q]
-     (exist [a b]
-       (== q [a b])
-       (appendo a b [1 2 3])))
+;(run 4 [q]
+;     (exist [a b]
+;       (== q [a b])
+;       (appendo a b [1 2 3])))
 ;=> ([[] [1 2 3]] 
 ;    [(1) (2 3)] 
 ;    [(1 2) (3)] 
