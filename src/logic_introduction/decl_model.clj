@@ -70,10 +70,24 @@
            [false true] (set-once! r @l)
            [false false] (set-or-equals @l @r))))
 
+(defn- lvar-w-comp-or-lcons
+  [v l]
+  (let [a (logic-variable)
+        d (logic-variable)]
+    (and (set-or-equals v (lcons a d))
+         (if (composite? l)
+           (and (set-or-equals (first l) a)
+                (set-or-equals (rest-nil l) d))
+           (and (set-or-equals (lfirst l) a)
+                (set-or-equals (lrest l) d))))))
+
 (defn- set-or-equals-df [^LogicVariable df v]
-  (match [(unbound? df)]
-         [true] (set-once! df v)
-         [false] (= @df v)))
+  (or 
+    (and (unbound? df)
+         (set-once! df v))
+    (cond 
+      (or (composite? v) (instance? LCons v)) (lvar-w-comp-or-lcons df v)
+      :else (= @df v))))
 
 (defmethod set-or-equals 
   [LogicVariable Object]
@@ -85,30 +99,76 @@
   [l r]
   (set-or-equals-df r l))
 
+(defmethod set-or-equals 
+  [LCons LCons]
+  [l r]
+  (and (set-or-equals (lfirst l) (lfirst r))
+       (set-or-equals (lrest l) (lrest r))))
+
+(defn lcons-with-comp [l r]
+  (if-not (or (lcons? r) (composite? r))
+    (match [(lcons? r)]
+           [true] (and (set-or-equals (lfirst l) (lfirst r))
+                       (set-or-equals (lrest l) (lrest r)))
+           [false] (and (set-or-equals (lfirst l) (first r))
+                        (set-or-equals (lrest l) (rest-nil r)))
+           :else false)
+    false))
+
+(defmethod set-or-equals 
+  [LCons Object]
+  [l r]
+  (lcons-with-comp l r))
+(defmethod set-or-equals 
+  [Object LCons]
+  [l r]
+  (lcons-with-comp r l))
+
+
+
 (declare lcons? lfirst lrest)
+(defn- rest-nil [n]
+  (let [r (rest n)]
+    (if (empty? r)
+      nil
+      r)))
+
 
 (defmethod set-or-equals 
   [Object Object]
   [l r]
   (or
-    (match [(lcons? l) (lcons? r)]
-           [true true] (and (set-or-equals (lfirst l) (lfirst r))
-                            (set-or-equals (lrest l) (lrest r)))
-           [false true] (and (set-or-equals (first l) (lfirst r))
-                             (set-or-equals (rest l) (lrest r)))
-           [true false] (and (set-or-equals (lfirst l) (first r))
-                             (set-or-equals (lrest l) (rest r)))
-           :else false)
     (and (composite? l) (composite? r)
          (set-or-equals (first l) (first r))
-         (set-or-equals (rest l) (rest r)))
+         (set-or-equals (rest-nil l) (rest-nil r)))
     (= l r)))
+
+(defmethod set-or-equals
+  [nil nil]
+  [l r]
+  true)
+(defmethod set-or-equals
+  [LogicVariable nil]
+  [l r]
+  (set-or-equals-df l r))
+(defmethod set-or-equals
+  [nil LogicVariable]
+  [l r]
+  (set-or-equals-df r l))
+(defmethod set-or-equals
+  [Object nil]
+  [l r]
+  false)
+(defmethod set-or-equals
+  [nil Object]
+  [l r]
+  false)
 
 (defmacro choose-all [& goals]
   (let [exp (map (fn [x] (list = true x)) goals)]
     `(and ~@exp)))
 
-(defmacro choose-one 
+(defmacro cond-one 
   "Clauses are lists of goals, each with one question
   and 0+ answers"
   [& clauses]
@@ -145,9 +205,9 @@
 (defprotocol LConsP
   (lfirst [this])
   (lrest [this]))
+
 (defprotocol LConsPrint
     (toShortString [this]))
-
 
 (deftype LCons [a d]
   LConsPrint
@@ -175,10 +235,89 @@
 (defmethod print-method LCons [x ^Writer writer]
   (.write writer (str x)))
 
+
+;; Handy predicates
+
 (defn caro [p a]
   (let [d (logic-variable)]
     (set-or-equals (lcons a d) p)))
 
+(defn cdro [p d]
+  (let [a (logic-variable)]
+    (set-or-equals (lcons a d) p)))
+
+(defn conso [a d p]
+  (set-or-equals (lcons a d) p))
+
+
+;; Polymorphic type
+
+(defn env-assoc [exp env type]
+  "env is an environment such that the expression key is
+  associated with the type value"
+  (cond-one 
+    ((undo-if-false [exp env type]
+                    (caro env [exp :- type])))
+    ((undo-if-false [exp env type]
+                    (let-logic-variable [?rest]
+                                        (choose-all
+                                          (cdro env ?rest)
+                                          (env-assoc exp ?rest type)))))))
+
+(defn expression-check [context exp result-type]
+  (cond-one
+    ((undo-if-false [exp context result-type]
+                    (env-assoc exp context result-type)))
+    ((undo-if-false [context exp result-type]
+                    (let-logic-variable [fun arg arg-type fun-type]
+                                        ;; TODO disequality
+                                        (set-or-equals exp [:apply fun arg])
+                                        (expression-check context arg arg-type)
+                                        (expression-check context fun [arg-type :> result-type]))))))
+
+
+;; Numbers
+
+(defn s [n]
+  "Returns n's succeeding natural number"
+  (lcons n []))
+
+(def zero 0)
+(def one   (s zero))
+(def two   (s one))
+(def three (s two))
+(def four  (s three))
+(def five  (s four))
+(def six   (s five))
+
+(defn natural-number [x]
+  "A relation where x is a natural number"
+  (println "top")
+  (let-logic-variable [n]
+    (cond-one
+      ((undo-if-false [x]
+                      (choose-all
+                        (do (println x) true)
+                        (set-or-equals x zero))))
+      ((undo-if-false [x]
+                      (choose-all
+                        (do (println x) true)
+                        (set-or-equals (s n) x)))
+       (natural-number n)))))
+
+(defn <=o [x y]
+  "x and y are natural numbers, such that x is less than or
+  equal to y"
+  (let-logic-variable [?x ?y]
+    (cond-one
+      ((undo-if-false [x y]
+                      (set-or-equals x zero))
+       (natural-number y))
+      ((undo-if-false [x y]
+                      (choose-all
+                        (set-or-equals (s ?x) x)
+                        (set-or-equals (s ?y) y)))
+       (<=o ?x ?y)))))
 
 ;; Semantics
 
@@ -301,7 +440,7 @@
 
 
 (defn person [x]
-  (choose-one
+  (cond-one
     ((undo-if-false [x]
        (set-or-equals x 'john)))
     ((undo-if-false [x]
