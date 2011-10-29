@@ -47,7 +47,7 @@
   of x and y"
   (matche [x y z]
           ([zero _ zero])
-          ([(s ?x) _ _] (exist [xy]
+          ([(s ?x) _ _] (fresh [xy]
                                (times ?x y xy)
                                (plus xy y z)))))
 
@@ -57,7 +57,7 @@
   (matche [n x y]
           ([(s ?x) zero zero])
           ([zero (s ?x) (s zero)])
-          ([(s ?n) _ _] (exist [z]
+          ([(s ?n) _ _] (fresh [z]
                                (exp ?n x z)
                                (times z x y)))))
 
@@ -65,7 +65,7 @@
   "f equals n factorial"
   (matche [n f]
           ([zero (s zero)])
-          ([(s ?n) _] (exist [f1]
+          ([(s ?n) _] (fresh [f1]
                              (factorial ?n f1)
                              (times (s ?n) f1 f)))))
 
@@ -78,7 +78,7 @@
 (defn modo [x y z]
   "z is the remainder of the integer division of x by y"
   (<o z y)
-  (exist [q qy]
+  (fresh [q qy]
          (times y q qy)
          (plus qy z x)))
 
@@ -88,7 +88,7 @@
   (matche [x y a]
           ([zero ?n (s ?n)])
           ([(s ?m) zero ?val] (ackermann ?m (s zero) ?val))
-          ([(s ?m) (s ?n) ?val] (exist [val1]
+          ([(s ?m) (s ?n) ?val] (fresh [val1]
                                        (ackermann (s ?m) ?n val1)
                                        (ackermann ?m val1 ?val)))))
 

@@ -20,7 +20,7 @@
     ((geto exp context result-type))
     ((matche [context exp result-type]
              ([_ [:apply ?fun ?arg] _]
-              (exist [arg-type]
+              (fresh [arg-type]
                      (!= ?fun ?arg)
                      (typedo context ?arg arg-type)
                      (typedo context ?fun [arg-type :> result-type])))))))
