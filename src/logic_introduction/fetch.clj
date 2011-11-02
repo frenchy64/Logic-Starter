@@ -24,7 +24,7 @@
 
 (defn fetch-data [fetched-data]
   "Output: fetched-data"
-  (exist [url datastream]
+  (fresh [url datastream]
     (url-to-process url)
     (slurpo url datastream)
     (read-jsono datastream fetched-data)))
@@ -42,7 +42,7 @@
 
 (defn process-json-object [json-object]
   "Input: json-object"
-  (exist [date-value indicator-value temp]
+  (fresh [date-value indicator-value temp]
     (json-object-has-value json-object :date date-value)
     (json-object-has-value json-object :value indicator-value)
     (project [date-value indicator-value]

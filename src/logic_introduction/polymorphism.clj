@@ -32,12 +32,12 @@
   "context is an environment such that expression exp executed in
   environment context results in type result-type"
   (conde
-    ((exist [poly-res-type]
+    ((fresh [poly-res-type]
             (polymorphic-type result-type poly-res-type)
             (env-assoc exp context poly-res-type)))
     ((matche [exp]
              ([[:apply ?fun ?arg]]
-              (exist [arg-type fun-type]
+              (fresh [arg-type fun-type]
                      (!= ?fun ?arg)
                      (expression-check context ?arg arg-type)
                      (expression-check context ?fun [arg-type :> result-type])))))))

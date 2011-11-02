@@ -1,9 +1,52 @@
 (ns logic-introduction.decl-model
-  (:refer-clojure :exclude [==])
+  (:refer-clojure :exclude [== compile])
   (:import [java.io Writer])
-  (:use ;[clojure.core.logic [minikanren :exclude [LCons walk lfirst lrest lcons?]] prelude nonrel match disequality]
-        [clojure.walk :only [walk prewalk postwalk]]
+  (:use [clojure.walk :only [walk prewalk postwalk]]
         [clojure.core.match [core :exclude [swap]]]))
+
+;; See bottom of file for some thoughts
+
+
+(defprotocol LConsP
+  (lfirst [this])
+  (lrest [this]))
+
+(defprotocol LConsPrint
+  (toShortString [this]))
+
+(deftype LCons [a d]
+  LConsPrint
+  (toShortString [this]
+                 (cond
+                   (.. this getClass (isInstance d)) (str a " " (toShortString d))
+                   :else (str a " . " d )))
+  Object
+  (toString [this] (cond
+                     (.. this getClass (isInstance d)) (str "(" a " " (toShortString d) ")")
+                     :else (str "(" a " . " d ")")))
+  LConsP
+  (lfirst [_] a)
+  (lrest [_] d))
+
+(defn lcons [a d]
+  "Constructs a sequence a with an improper tail d if d is a logic variable."
+  (if (or (coll? d) (nil? d))
+    (cons a (seq d))
+    (LCons. a d )))
+
+(defn lcons? [x]
+  (instance? LCons x))
+
+(defmethod print-method LCons [x ^Writer writer]
+  (.write writer (str x)))
+
+(defn- rest-nil [n]
+  (let [r (rest n)]
+    (if (empty? r)
+      nil
+      r)))
+
+
 
 (defn- composite?
   "Taken from the old `contrib.core/seqable?`. Since the meaning of 'seqable' is
@@ -126,13 +169,6 @@
 
 
 
-(declare lcons? lfirst lrest)
-(defn- rest-nil [n]
-  (let [r (rest n)]
-    (if (empty? r)
-      nil
-      r)))
-
 
 (defmethod set-or-equals 
   [Object Object]
@@ -201,39 +237,6 @@
               ~@body))
        (reify-solved ~n)
        :logic-introduction.decl-model/NORESULT)))
-
-(defprotocol LConsP
-  (lfirst [this])
-  (lrest [this]))
-
-(defprotocol LConsPrint
-    (toShortString [this]))
-
-(deftype LCons [a d]
-  LConsPrint
-  (toShortString [this]
-                 (cond
-                   (.. this getClass (isInstance d)) (str a " " (toShortString d))
-                   :else (str a " . " d )))
-  Object
-  (toString [this] (cond
-                     (.. this getClass (isInstance d)) (str "(" a " " (toShortString d) ")")
-                     :else (str "(" a " . " d ")")))
-  LConsP
-  (lfirst [_] a)
-  (lrest [_] d))
-
-(defn lcons [a d]
-  "Constructs a sequence a with an improper tail d if d is a logic variable."
-  (if (or (coll? d) (nil? d))
-    (cons a (seq d))
-    (LCons. a d )))
-
-(defn lcons? [x]
-  (instance? LCons x))
-
-(defmethod print-method LCons [x ^Writer writer]
-  (.write writer (str x)))
 
 
 ;; Handy predicates

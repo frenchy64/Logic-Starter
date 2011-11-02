@@ -1,6 +1,7 @@
 (ns logic-introduction.subs
-  (:use [clojure.core.match.core :only [match]])
-  (:refer-clojure :exclude [==]))
+  (:refer-clojure :exclude [== reify]))
+
+;; Skeleton of a minikanren-like language
 
 (def empty-substitution '())
 

@@ -29,7 +29,7 @@
   (tabled [ancestor descendant]
     (conde
       ((derives ancestor descendant))
-      ((exist [i]
+      ((fresh [i]
          (derived-ancestor ancestor i)
          (derives i descendant))))))
 
@@ -62,7 +62,7 @@
   ;; Quicksort: Pg 70, Art of Prolog
   (matche [ts out]
           ([[?x . ?xs] ?ys]
-            (exist [littles bigs ls bs]
+            (fresh [littles bigs ls bs]
                    (partition-by-preference ?xs ?x littles bigs)
                    (sort-by-preference littles ls)
                    (sort-by-preference bigs bs)
