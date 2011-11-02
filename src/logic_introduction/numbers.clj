@@ -1,6 +1,6 @@
 (ns logic-introduction.numbers
-  (:refer-clojure :exclude [inc reify ==])
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
+  (:refer-clojure :exclude [==])
+  (:use [clojure.core.logic]))
 
 ;; From "Art of Prolog", Chapter 3
 

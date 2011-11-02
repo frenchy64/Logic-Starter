@@ -1,7 +1,7 @@
 (ns logic-introduction.core
-  (:refer-clojure :exclude [inc reify ==])
+  (:refer-clojure :exclude [==])
   (:require (clojure (walk :as w)))
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
+  (:use [clojure.core.logic]))
 
 
 ;; Logic functions

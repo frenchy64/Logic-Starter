@@ -1,7 +1,7 @@
 (ns logic-introduction.fetch
-  (:refer-clojure :exclude [inc reify ==])
+  (:refer-clojure :exclude [==])
   (:use [clojure.data.json :only (json-str write-json read-json)])
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
+  (:use [clojure.core.logic]))
 
 ;; http://www.daddymodern.com/useful-prolog/
 

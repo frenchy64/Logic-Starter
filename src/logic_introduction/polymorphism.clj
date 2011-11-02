@@ -1,7 +1,7 @@
 (ns logic-introduction.polymorphism
-  (:refer-clojure :exclude [inc reify ==])
+  (:refer-clojure :exclude [==])
   (:use [logic-introduction.facts])
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
+  (:use [clojure.core.logic]))
 
 (defn env-assoc [exp env type]
   "env is an environment such that the expression key is

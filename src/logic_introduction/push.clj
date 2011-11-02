@@ -1,6 +1,6 @@
 (ns logic-introduction.push
-  (:refer-clojure :exclude [inc reify ==])
-  (:use [clojure.core.logic minikanren prelude nonrel match disequality]))
+  (:refer-clojure :exclude [==])
+  (:use [clojure.core.logic]))
 
 ;; Calculate palindromes using pushdown automata
 ;; From "The Art of Prolog" Sterling and Shapiro, 2nd ed, pg 381
@@ -18,10 +18,10 @@
 
 ;  (run* [q]
 ;        (palindrome [1 2 3 2 1]))
-;  ;=> (_.0)
+;  => (_.0)
 ;  (run* [q]
 ;        (palindrome [1 2 3 2]))
-;  ;=> ()
+;  => ()
 ;  (run* [q]
 ;        (palindrome [1 2 3 2 q]))
-;  ;=> (1))
+;  => (1)

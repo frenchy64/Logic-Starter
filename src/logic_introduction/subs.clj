@@ -1,6 +1,6 @@
 (ns logic-introduction.subs
   (:use [clojure.core.match.core :only [match]])
-  (:refer-clojure :exclude [reify ==]))
+  (:refer-clojure :exclude [==]))
 
 (def empty-substitution '())
 

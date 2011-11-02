@@ -1,5 +1,5 @@
 (ns logic-introduction.decl-model
-  (:refer-clojure :exclude [inc reify == compile parse])
+  (:refer-clojure :exclude [==])
   (:import [java.io Writer])
   (:use ;[clojure.core.logic [minikanren :exclude [LCons walk lfirst lrest lcons?]] prelude nonrel match disequality]
         [clojure.walk :only [walk prewalk postwalk]]
