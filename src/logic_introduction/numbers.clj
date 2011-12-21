@@ -4,8 +4,9 @@
 
 ;; From "Art of Prolog", Chapter 3
 
-(defn s [a d]
-  (conso a [] d))
+(defn s [x y]
+  "x and y are natural numbers, such that y is the successor of x"
+  (conso x [] y))
 
 (def zero  0)
 (def one   (first (run 1 [q] (s zero q))))
