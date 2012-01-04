@@ -1,8 +1,13 @@
 (ns logic-introduction.extend
+  "Extend core.logic with external databases.
+  This example defines a custom goal ns-fun, which acts as a query interface
+  to the Clojure namespacing system"
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic]))
 
-(defn ns-fun [nsym fun]
+(defn ns-fun 
+  "nsym and fun are symbols such that nsym names a namespace that contains the function named fun"
+  [nsym fun]
   (fn [a]
     (to-stream 
       (let [all-ns-syms (set (map (comp symbol str) (all-ns)))]
@@ -22,10 +27,29 @@
           (remove nil?))))))
 
 (comment
-(run* [q] (fresh [a b] (== q [a b]) (ns-fun a b)))
+
 (run* [q] (ns-fun 'clojure.core q))
+;=> (sorted-map read-line re-pattern keyword? unchecked-inc-int val 
+;    chunked-seq? find-protocol-impl vector-of ... )
+
 (run* [q] (ns-fun 'clojure.repl q))
+;=> (source stack-element-str set-break-handler! find-doc thread-stopper 
+;    demunge apropos dir dir-fn root-cause pst source-fn doc)
+
 (run* [q] (ns-fun 'noexist q))
+;=> ()
+
+(run* [q] (fresh [a b] (== q [a b]) (ns-fun a b)))
+;=> ([clojure.set rename-keys] 
+;    [clojure.set union] 
+;    [clojure.set select] 
+;    [clojure.set project] 
+;    [clojure.set superset?] 
+;    [clojure.set join]
+;    ....
+;    [clojure.test *report-counters*] 
+;    [clojure.test assert-any]
+;    ...)
   )
 
 ;  me:  I made a goal that treats the Clojure namespace system as a database
