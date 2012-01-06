@@ -5,6 +5,53 @@
   (:refer-clojure :exclude [==])
   (:use [clojure.core.logic]))
 
+;; TODO add note about having to walk any value that's potentially an lvar before
+;; using it on a regular Clojure fn
+
+(defn ns-mapo
+  [ns-obj k v]
+  (fn [a]
+    (let [ns-obj (walk a ns-obj)
+          k (walk a k)
+          v (walk a v)]
+      (to-stream
+        (->>
+          (condp = (map lvar? [ns-obj k v])
+            [false false false] (when (= v (ns-resolve ns-obj k))
+                                  [a])
+            [false false true] (when-let [[_ m] (find (ns-map ns-obj) k)]
+                                 [(unify a v m)])
+            [false true false] (for [mapping (ns-map ns-obj)]
+                                 (when (= v (val mapping))
+                                   (unify a k (key mapping))))
+            [false true true] (for [current-ns (all-ns)
+                                    mapping (ns-map current-ns)]
+                                (unify a [k v] mapping))
+            [true false false] (for [current-ns (all-ns)
+                                     mapping (ns-map current-ns)]
+                                 (unify a [ns-obj [k v]] [current-ns mapping]))
+            [true false true] (for [current-ns (all-ns)
+                                    mapping (ns-map current-ns)]
+                                (when-let [[_ m] (find (ns-map ns-obj) k)]
+                                  [(unify a [ns-obj v] [current-ns m])]))
+            [true true false] (for [current-ns (all-ns)
+                                    mapping (ns-map current-ns)]
+                                (when (= v (val mapping))
+                                  (unify a [ns-obj k] [current-ns (key mapping)])))
+            [true true true] (for [current-ns (all-ns)
+                                   mapping (ns-map current-ns)]
+                               (unify a [ns-obj [k v]] [current-ns mapping])))
+          (remove not))))))
+
+(comment
+(count (run 10000 [q]
+                                 (fresh [n1 n2 a1 a2 v]
+                                        (ns-mapo n1 a1 v)
+                                        (ns-mapo n2 a2 v)
+                                        (!= n1 n2)
+                                        (== q [n1 n2 v]))))
+  )
+
 (defn ns-fun 
   "nsym and fun are symbols such that nsym names a namespace that contains the function named fun"
   [nsym fun]
@@ -14,8 +61,8 @@
         (->>
           (cond
             ;; ground namespace, can restrict search
-            (not (lvar? (walk a nsym))) (for [fun-sym (when (all-ns-syms nsym)
-                                                        (-> nsym find-ns ns-publics keys))]
+            (not (lvar? (walk a nsym))) (for [fun-sym (when (all-ns-syms (walk a nsym))
+                                                        (-> (walk a nsym) find-ns ns-publics keys))]
                                           (unify a [nsym fun] [nsym fun-sym]))
 
             ;; otherwise, search cartesian product
@@ -25,6 +72,23 @@
                       (unify a [nsym fun] [gen-ns fun-sym]))))
 
           (remove not))))))
+
+(defn descendanto
+  "Queries the Clojure hierarchy"
+  ([parent child] (descendanto nil parent child))
+  ([h parent child]
+   (fn [a]
+     (to-stream
+       (->>
+         (condp = (map (partial lvar-in? a) [parent child])
+           [false false] (when (contains? (apply ancestors (concat (when h [h]) [child])) parent)
+                           [a])
+           [false true] (for [desc (apply descendants (concat (when h [h]) [parent]))]
+                          (unify a [parent child] [parent desc]))
+           [true false] (for [ancest (apply ancestors (concat (when h [h]) [child]))]
+                          (unify a [parent child] [ancest child]))
+           [true true] (throw (Exception. "class-relation cannot have both arguments fresh")))
+         (remove not))))))
 
 (comment
 
