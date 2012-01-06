@@ -76,12 +76,12 @@
 ;  Tassilo:  Ah, ok.  Now I understand.
 ; That's exactly what I wanted to do on my own.
 ; Converting lazy seqs to choices.
-;  me:  the last important point is the (remove nil?) at the end of ns-fun
+;  me:  the last important point is the (remove not) at the end of ns-fun
 ;  Tassilo:  What's its purpose?
 ;  me:  take a step back and read what each clause of the `cond` returns
 ; `unify` takes a substitution, and two terms to unify. it then returns a new substitution where both terms are equal
-; OR returns nil
-; ie. cannot unify = nil
+; OR returns false
+; ie. cannot unify = false
 ; and we wrap these calls in a list comprehension (for)
 ;  Tassilo:  Ah, ok, I see.
 ;  me:  so it's really quite elegant and simple
