@@ -24,7 +24,7 @@
                     (let [gen-ns (symbol (str ns))]
                       (unify a [nsym fun] [gen-ns fun-sym]))))
 
-          (remove nil?))))))
+          (remove not))))))
 
 (comment
 
@@ -38,6 +38,8 @@
 
 (run* [q] (ns-fun 'noexist q))
 ;=> ()
+
+(run* [q] (ns-fun q 'remove))
 
 (run* [q] (fresh [a b] (== q [a b]) (ns-fun a b)))
 ;=> ([clojure.set rename-keys] 
