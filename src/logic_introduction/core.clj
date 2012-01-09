@@ -6,16 +6,18 @@
 
 ;; Logic functions
 
-(defn geto [key env value]
+(defn geto 
   "env is an environment such that the expression key is
   associated with the expression value"
+  [key env value]
   (matche [env]
           ([[[key :- value] . _]])
           ([[_ . ?rest]] (geto key ?rest value))))
 
-(defn typedo [context exp result-type]
+(defn typedo 
   "context is an environment such that expression exp executed in
   environment context results in type result-type"
+  [context exp result-type]
   (conde
     ((geto exp context result-type))
     ((matche [context exp result-type]
@@ -28,8 +30,9 @@
 
 ;; Frontend functions
 
-(defmacro deftyped [name type arg-vec & body]
+(defmacro deftyped 
   "Defines a function with a strict type"
+  [name type arg-vec & body]
   (list* `defn
          (with-meta name
                     (assoc (meta name)
@@ -93,8 +96,9 @@
     (get-return t)))
 
   
-(defn type-check-form [form]
+(defn type-check-form 
   "Type checks a form"
+  [form]
   (let [call (-> form
                params-to-sym
                call-to-lambda)

@@ -5,43 +5,50 @@
 
 ;; http://www.daddymodern.com/useful-prolog/
 
-(defn url-to-process [url]
+(defn url-to-process 
   "Output: url"
+  [url]
   (== url "http://api.worldbank.org/countries/USA/indicators/AG.AGR.TRAC.NO?per_page=10&date=2005:2011&format=json"))
 
-(defn slurpo [url datastream]
+(defn slurpo 
   "Input: url
   Output: datastream"
+  [url datastream]
   (project [url]
     (== datastream (slurp url))))
 
-(defn read-jsono [input output]
+(defn read-jsono 
   "Input: input
   Output: output"
+  [input output]
   (project [input]
     (== output (read-json input))))
 
 
-(defn fetch-data [fetched-data]
+(defn fetch-data 
   "Output: fetched-data"
+  [fetched-data]
   (fresh [url datastream]
     (url-to-process url)
     (slurpo url datastream)
     (read-jsono datastream fetched-data)))
 
-(defn process-data-header [header]
+(defn process-data-header 
   "Input: header"
+  [header]
   (matche [header]
           ([?ignore])))
 
-(defn json-object-has-value [json-object name value]
+(defn json-object-has-value 
   "Input: json-object, name
   Output: value"
+  [json-object name value]
   (project [json-object name]
     (== [name value] (find json-object name))))
 
-(defn process-json-object [json-object]
+(defn process-json-object 
   "Input: json-object"
+  [json-object]
   (fresh [date-value indicator-value temp]
     (json-object-has-value json-object :date date-value)
     (json-object-has-value json-object :value indicator-value)
@@ -51,16 +58,18 @@
              (== temp (println "Value: " indicator-value))
              (== temp (println)))))
 
-(defn process-data-contents [json]
+(defn process-data-contents 
   "Input: json"
+  [json]
   (matche [json]
           ([[]])
           ([[?json-object . ?rest]]
            (process-json-object ?json-object)
            (process-data-contents ?rest))))
 
-(defn process-data [json]
+(defn process-data 
   "Input: json"
+  [json]
   (matche [json]
           ([[?header ?contents]] 
             (process-data-header ?header)

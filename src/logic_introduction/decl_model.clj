@@ -28,8 +28,9 @@
   (lfirst [_] a)
   (lrest [_] d))
 
-(defn lcons [a d]
+(defn lcons 
   "Constructs a sequence a with an improper tail d if d is a logic variable."
+  [a d]
   (if (or (coll? d) (nil? d))
     (cons a (seq d))
     (LCons. a d )))
@@ -255,9 +256,10 @@
 
 ;; Polymorphic type
 
-(defn env-assoc [exp env type]
+(defn env-assoc 
   "env is an environment such that the expression key is
   associated with the type value"
+  [exp env type]
   (cond-one 
     ((undo-if-false [exp env type]
                     (caro env [exp :- type])))
@@ -281,8 +283,9 @@
 
 ;; Numbers
 
-(defn s [n]
+(defn s 
   "Returns n's succeeding natural number"
+  [n]
   (lcons n []))
 
 (def zero 0)
@@ -293,8 +296,9 @@
 (def five  (s four))
 (def six   (s five))
 
-(defn natural-number [x]
+(defn natural-number 
   "A relation where x is a natural number"
+  [x]
   (println "top")
   (let-logic-variable [n]
     (cond-one
@@ -308,9 +312,10 @@
                         (set-or-equals (s n) x)))
        (natural-number n)))))
 
-(defn <=o [x y]
+(defn <=o 
   "x and y are natural numbers, such that x is less than or
   equal to y"
+  [x y]
   (let-logic-variable [?x ?y]
     (cond-one
       ((undo-if-false [x y]
