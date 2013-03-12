@@ -61,9 +61,9 @@
         (->>
           (cond
             ;; ground namespace, can restrict search
-            (not (lvar? (walk a nsym))) (for [fun-sym (when (all-ns-syms (walk a nsym))
-                                                        (-> (walk a nsym) find-ns ns-publics keys))]
-                                          (unify a [nsym fun] [nsym fun-sym]))
+            (ground-term? nsym a) (for [fun-sym (when (all-ns-syms (walk a nsym))
+                                                  (-> (walk a nsym) find-ns ns-publics keys))]
+                                    (unify a [nsym fun] [nsym fun-sym]))
 
             ;; otherwise, search cartesian product
             :else (for [ns (all-ns)
@@ -72,23 +72,6 @@
                       (unify a [nsym fun] [gen-ns fun-sym]))))
 
           (remove not))))))
-
-(defn descendanto
-  "Queries the Clojure hierarchy"
-  ([parent child] (descendanto nil parent child))
-  ([h parent child]
-   (fn [a]
-     (to-stream
-       (->>
-         (condp = (map (partial lvar-in? a) [parent child])
-           [false false] (when (contains? (apply ancestors (concat (when h [h]) [child])) parent)
-                           [a])
-           [false true] (for [desc (apply descendants (concat (when h [h]) [parent]))]
-                          (unify a [parent child] [parent desc]))
-           [true false] (for [ancest (apply ancestors (concat (when h [h]) [child]))]
-                          (unify a [parent child] [ancest child]))
-           [true true] (throw (Exception. "class-relation cannot have both arguments fresh")))
-         (remove not))))))
 
 (comment
 
@@ -116,6 +99,48 @@
 ;    [clojure.test *report-counters*] 
 ;    [clojure.test assert-any]
 ;    ...)
+  )
+
+(defn descendanto
+  "Queries the Clojure hierarchy"
+  ([parent child] (descendanto nil parent child))
+  ([h parent child]
+   (fn [a]
+     (to-stream
+       (->>
+         (condp = (map #(ground-term? % a) [parent child])
+           ; parent & child ground
+           [true true] (when (contains? (apply ancestors (concat (when h [h]) [child])) parent)
+                           [a])
+           ; parent ground, child unground
+           [true false] (for [desc (apply descendants (concat (when h [h]) [parent]))]
+                          (unify a [parent child] [parent desc]))
+           ; parent non-ground, child ground
+           [false true] (for [ancest (apply ancestors (concat (when h [h]) [child]))]
+                          (unify a [parent child] [ancest child]))
+           ; parent & child non-ground
+           [false false] (throw (Exception. "class-relation cannot have both arguments non-ground")))
+         (remove not))))))
+
+(comment
+  (run* [q]
+        (descendanto q Integer))
+  ;=> (java.io.Serializable java.lang.Object java.lang.Comparable java.lang.Number)
+
+  (run* [q]
+        (descendanto Number Integer)
+        (== true q))
+  ;=> (true)
+
+  (run* [q]
+        (descendanto Number clojure.lang.Symbol)
+        (== true q))
+  ;=> ()
+
+  ;descendants doesn't work with classes
+  (run 1 [q]
+       (descendanto Integer q))
+  ;=> #<UnsupportedOperationException java.lang.UnsupportedOperationException: Can't get descendants of classes>
   )
 
 ;  me:  I made a goal that treats the Clojure namespace system as a database
